@@ -6,9 +6,10 @@
 """Conveniance wrapper to perform STFT and iSTFT"""
 
 import torch as th
+import typing as tp
 
 
-def spectro(x, n_fft=512, hop_length=None, pad=0):
+def spectro(x: th.Tensor, n_fft: int = 512, hop_length: tp.Optional[int] = None, pad: int = 0) -> th.Tensor:
     *other, length = x.shape
     x = x.reshape(-1, length)
     is_mps_xpu = x.device.type in ['mps', 'xpu']
@@ -27,7 +28,7 @@ def spectro(x, n_fft=512, hop_length=None, pad=0):
     return z.view(*other, freqs, frame)
 
 
-def ispectro(z, hop_length=None, length=None, pad=0):
+def ispectro(z: th.Tensor, hop_length: tp.Optional[int] = None, length: tp.Optional[int] = None, pad: int = 0) -> th.Tensor:
     *other, freqs, frames = z.shape
     n_fft = 2 * freqs - 2
     z = z.view(-1, freqs, frames)
