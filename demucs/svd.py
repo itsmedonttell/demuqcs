@@ -6,9 +6,10 @@
 """Ways to make the model stronger."""
 import random
 import torch
+import typing as tp
 
 
-def power_iteration(m, niters=1, bs=1):
+def power_iteration(m: torch.Tensor, niters: int = 1, bs: int = 1) -> torch.Tensor:
     """This is the power method. batch size is used to try multiple starting point in parallel."""
     assert m.dim() == 2
     assert m.shape[0] == m.shape[1]
@@ -25,11 +26,11 @@ def power_iteration(m, niters=1, bs=1):
 
 # We need a shared RNG to make sure all the distributed worker will skip the penalty together,
 # as otherwise we wouldn't get any speed up.
-penalty_rng = random.Random(1234)
+penalty_rng: random.Random = random.Random(1234)
 
 
-def svd_penalty(model, min_size=0.1, dim=1, niters=2, powm=False, convtr=True,
-                proba=1, conv_only=False, exact=False, bs=1):
+def svd_penalty(model: torch.nn.Module, min_size: float = 0.1, dim: int = 1, niters: int = 2, powm: bool = False, convtr: bool = True,
+                proba: float = 1, conv_only: bool = False, exact: bool = False, bs: int = 1) -> float:
     """
     Penalty on the largest singular value for a layer.
     Args:
@@ -47,37 +48,38 @@ def svd_penalty(model, min_size=0.1, dim=1, niters=2, powm=False, convtr=True,
         - exact: use exact SVD (slow but useful at validation).
         - bs: batch_size for power method.
     """
-    total = 0
+    total: float = 0.0
     if penalty_rng.random() > proba:
-        return 0.
+        return 0.0
 
     for m in model.modules():
         for name, p in m.named_parameters(recurse=False):
             if p.numel() / 2**18 < min_size:
                 continue
+            p_tensor: torch.Tensor = p  # Keep original as p, work with p_tensor for reshaping
             if convtr:
                 if isinstance(m, (torch.nn.ConvTranspose1d, torch.nn.ConvTranspose2d)):
                     if p.dim() in [3, 4]:
-                        p = p.transpose(0, 1).contiguous()
-            if p.dim() == 3:
-                p = p.view(len(p), -1)
-            elif p.dim() == 4:
-                p = p.view(len(p), -1)
-            elif p.dim() == 1:
+                        p_tensor = p.transpose(0, 1).contiguous()
+            if p_tensor.dim() == 3:
+                p_tensor = p_tensor.view(len(p_tensor), -1)
+            elif p_tensor.dim() == 4:
+                p_tensor = p_tensor.view(len(p_tensor), -1)
+            elif p_tensor.dim() == 1:
                 continue
             elif conv_only:
                 continue
-            assert p.dim() == 2, (name, p.shape)
+            assert p_tensor.dim() == 2, (name, p_tensor.shape)
             if exact:
-                estimate = torch.svd(p, compute_uv=False)[1].pow(2).max()
+                estimate = torch.svd(p_tensor, compute_uv=False)[1].pow(2).max()
             elif powm:
-                a, b = p.shape
+                a, b = p_tensor.shape
                 if a < b:
-                    n = p.mm(p.t())
+                    n = p_tensor.mm(p_tensor.t())
                 else:
-                    n = p.t().mm(p)
+                    n = p_tensor.t().mm(p_tensor)
                 estimate = power_iteration(n, niters, bs)
             else:
-                estimate = torch.svd_lowrank(p, dim, niters)[1][0].pow(2)
-            total += estimate
+                estimate = torch.svd_lowrank(p_tensor, dim, niters)[1][0].pow(2)
+            total += estimate.item()
     return total / proba

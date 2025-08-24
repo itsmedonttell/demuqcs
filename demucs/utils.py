@@ -17,7 +17,7 @@ from torch.nn import functional as F
 from torch.utils.data import Subset
 
 
-def unfold(a, kernel_size, stride):
+def unfold(a: torch.Tensor, kernel_size: int, stride: int) -> torch.Tensor:
     """Given input of size [*OT, T], output Tensor of size [*OT, F, K]
     with K the kernel size, by extracting frames with the given stride.
 
@@ -54,7 +54,7 @@ def center_trim(tensor: torch.Tensor, reference: tp.Union[torch.Tensor, int]):
     return tensor
 
 
-def pull_metric(history: tp.List[dict], name: str):
+def pull_metric(history: tp.List[dict], name: str) -> tp.List[tp.Any]:
     out = []
     for metrics in history:
         metric = metrics
@@ -64,7 +64,7 @@ def pull_metric(history: tp.List[dict], name: str):
     return out
 
 
-def EMA(beta: float = 1):
+def EMA(beta: float = 1) -> tp.Callable[[dict, float], dict]:
     """
     Exponential Moving Average callback.
     Returns a single function that can be called to repeatidly update the EMA
@@ -98,7 +98,7 @@ def sizeof_fmt(num: float, suffix: str = 'B'):
 
 
 @contextmanager
-def temp_filenames(count: int, delete=True):
+def temp_filenames(count: int, delete: bool = True) -> tp.Generator[tp.List[str], None, None]:
     names = []
     try:
         for _ in range(count):
@@ -110,7 +110,7 @@ def temp_filenames(count: int, delete=True):
                 os.unlink(name)
 
 
-def random_subset(dataset, max_samples: int, seed: int = 42):
+def random_subset(dataset: tp.Any, max_samples: int, seed: int = 42) -> tp.Any:
     if max_samples >= len(dataset):
         return dataset
 
@@ -121,29 +121,29 @@ def random_subset(dataset, max_samples: int, seed: int = 42):
 
 class DummyPoolExecutor:
     class DummyResult:
-        def __init__(self, func, _dict, *args, **kwargs):
+        def __init__(self, func: tp.Callable, _dict: dict, *args: tp.Any, **kwargs: tp.Any) -> None:
             self.func = func
             self._dict = _dict
             self.args = args
             self.kwargs = kwargs
 
-        def result(self):
+        def result(self) -> tp.Any:
             if self._dict["run"]:
                 return self.func(*self.args, **self.kwargs)
             else:
                 raise CancelledError()
 
-    def __init__(self, workers=0):
+    def __init__(self, workers: int = 0) -> None:
         self._dict = {"run": True}
 
-    def submit(self, func, *args, **kwargs):
+    def submit(self, func: tp.Callable, *args: tp.Any, **kwargs: tp.Any) -> 'DummyPoolExecutor.DummyResult':
         return DummyPoolExecutor.DummyResult(func, self._dict, *args, **kwargs)
 
-    def shutdown(self, *_, **__):
+    def shutdown(self, *_: tp.Any, **__: tp.Any) -> None:
         self._dict["run"] = False
 
-    def __enter__(self):
+    def __enter__(self) -> 'DummyPoolExecutor':
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
+    def __exit__(self, exc_type: tp.Any, exc_value: tp.Any, exc_tb: tp.Any) -> None:
         return

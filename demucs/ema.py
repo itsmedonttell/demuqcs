@@ -6,6 +6,7 @@
 
 # Inspired from https://github.com/rwightman/pytorch-image-models
 from contextlib import contextmanager
+import typing as tp
 
 import torch
 
@@ -21,17 +22,17 @@ class ModelEMA:
         with ema.swap():
             # compute valid metrics with averaged model.
     """
-    def __init__(self, model, decay=0.9999, unbias=True, device='cpu'):
+    def __init__(self, model: torch.nn.Module, decay: float = 0.9999, unbias: bool = True, device: str = 'cpu') -> None:
         self.decay = decay
         self.model = model
-        self.state = {}
-        self.count = 0
+        self.state: tp.Dict[str, torch.Tensor] = {}
+        self.count: float = 0
         self.device = device
         self.unbias = unbias
 
         self._init()
 
-    def _init(self):
+    def _init(self) -> None:
         for key, val in self.model.state_dict().items():
             if val.dtype != torch.float32:
                 continue
@@ -39,7 +40,7 @@ class ModelEMA:
             if key not in self.state:
                 self.state[key] = val.detach().to(device, copy=True)
 
-    def update(self):
+    def update(self) -> None:
         if self.unbias:
             self.count = self.count * self.decay + 1
             w = 1 / self.count
@@ -53,14 +54,14 @@ class ModelEMA:
             self.state[key].add_(val.detach().to(device), alpha=w)
 
     @contextmanager
-    def swap(self):
+    def swap(self) -> tp.Generator[None, None, None]:
         with swap_state(self.model, self.state):
             yield
 
-    def state_dict(self):
+    def state_dict(self) -> tp.Dict[str, tp.Any]:
         return {'state': self.state, 'count': self.count}
 
-    def load_state_dict(self, state):
+    def load_state_dict(self, state: tp.Dict[str, tp.Any]) -> None:
         self.count = state['count']
         for k, v in state['state'].items():
             self.state[k].copy_(v)

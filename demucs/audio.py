@@ -18,7 +18,7 @@ import typing as tp
 from .utils import temp_filenames
 
 
-def _read_info(path):
+def _read_info(path: Path) -> dict:
     stdout_data = sp.check_output([
         'ffprobe', "-loglevel", "panic",
         str(path), '-print_format', 'json', '-show_format', '-show_streams'
@@ -33,10 +33,10 @@ class AudioFile:
     """
     def __init__(self, path: Path):
         self.path = Path(path)
-        self._info = None
+        self._info: tp.Optional[dict] = None
 
-    def __repr__(self):
-        features = [("path", self.path)]
+    def __repr__(self) -> str:
+        features: tp.List[tp.Tuple[str, tp.Any]] = [("path", self.path)]
         features.append(("samplerate", self.samplerate()))
         features.append(("channels", self.channels()))
         features.append(("streams", len(self)))
@@ -44,37 +44,37 @@ class AudioFile:
         return f"AudioFile({features_str})"
 
     @property
-    def info(self):
+    def info(self) -> dict:
         if self._info is None:
             self._info = _read_info(self.path)
         return self._info
 
     @property
-    def duration(self):
+    def duration(self) -> float:
         return float(self.info['format']['duration'])
 
     @property
-    def _audio_streams(self):
+    def _audio_streams(self) -> tp.List[int]:
         return [
             index for index, stream in enumerate(self.info["streams"])
             if stream["codec_type"] == "audio"
         ]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._audio_streams)
 
-    def channels(self, stream=0):
+    def channels(self, stream: int = 0) -> int:
         return int(self.info['streams'][self._audio_streams[stream]]['channels'])
 
-    def samplerate(self, stream=0):
+    def samplerate(self, stream: int = 0) -> int:
         return int(self.info['streams'][self._audio_streams[stream]]['sample_rate'])
 
     def read(self,
-             seek_time=None,
-             duration=None,
-             streams=slice(None),
-             samplerate=None,
-             channels=None):
+             seek_time: tp.Optional[float] = None,
+             duration: tp.Optional[float] = None,
+             streams: tp.Union[slice, int, tp.List[int]] = slice(None),
+             samplerate: tp.Optional[int] = None,
+             channels: tp.Optional[int] = None) -> torch.Tensor:
         """
         Slightly more efficient implementation than stempeg,
         in particular, this will extract all stems at once
@@ -96,10 +96,12 @@ class AudioFile:
                 Our definition of mono is simply the average of the two channels. Any other
                 value will be ignored.
         """
-        streams = np.array(range(len(self)))[streams]
-        single = not isinstance(streams, np.ndarray)
+        streams_array = np.array(range(len(self)))[streams]
+        single = not isinstance(streams_array, np.ndarray)
         if single:
-            streams = [streams]
+            streams_list = [streams_array]
+        else:
+            streams_list = streams_array.tolist()
 
         if duration is None:
             target_size = None
@@ -108,13 +110,13 @@ class AudioFile:
             target_size = int((samplerate or self.samplerate()) * duration)
             query_duration = float((target_size + 1) / (samplerate or self.samplerate()))
 
-        with temp_filenames(len(streams)) as filenames:
+        with temp_filenames(len(streams_list)) as filenames:
             command = ['ffmpeg', '-y']
             command += ['-loglevel', 'panic']
             if seek_time:
                 command += ['-ss', str(seek_time)]
             command += ['-i', str(self.path)]
-            for stream, filename in zip(streams, filenames):
+            for stream, filename in zip(streams_list, filenames):
                 command += ['-map', f'0:{self._audio_streams[stream]}']
                 if query_duration is not None:
                     command += ['-t', str(query_duration)]
@@ -127,21 +129,21 @@ class AudioFile:
             sp.run(command, check=True)
             wavs = []
             for filename in filenames:
-                wav = np.fromfile(filename, dtype=np.float32)
-                wav = torch.from_numpy(wav)
-                wav = wav.view(-1, self.channels()).t()
+                wav_numpy = np.fromfile(filename, dtype=np.float32)
+                wav_tensor = torch.from_numpy(wav_numpy)
+                wav_tensor = wav_tensor.view(-1, self.channels()).t()
                 if channels is not None:
-                    wav = convert_audio_channels(wav, channels)
+                    wav_tensor = convert_audio_channels(wav_tensor, channels)
                 if target_size is not None:
-                    wav = wav[..., :target_size]
-                wavs.append(wav)
+                    wav_tensor = wav_tensor[..., :target_size]
+                wavs.append(wav_tensor)
         wav = torch.stack(wavs, dim=0)
         if single:
             wav = wav[0]
         return wav
 
 
-def convert_audio_channels(wav, channels=2):
+def convert_audio_channels(wav: torch.Tensor, channels: int = 2) -> torch.Tensor:
     """Convert audio to the given number of channels."""
     *shape, src_channels, length = wav.shape
     if src_channels == channels:
@@ -167,13 +169,13 @@ def convert_audio_channels(wav, channels=2):
     return wav
 
 
-def convert_audio(wav, from_samplerate, to_samplerate, channels) -> torch.Tensor:
+def convert_audio(wav: torch.Tensor, from_samplerate: int, to_samplerate: int, channels: int) -> torch.Tensor:
     """Convert audio from a given samplerate to a target one and target number of channels."""
     wav = convert_audio_channels(wav, channels)
     return julius.resample_frac(wav, from_samplerate, to_samplerate)
 
 
-def i16_pcm(wav):
+def i16_pcm(wav: torch.Tensor) -> torch.Tensor:
     """Convert audio to 16 bits integer PCM format."""
     if wav.dtype.is_floating_point:
         return (wav.clamp_(-1, 1) * (2**15 - 1)).short()
@@ -181,7 +183,7 @@ def i16_pcm(wav):
         return wav
 
 
-def f32_pcm(wav):
+def f32_pcm(wav: torch.Tensor) -> torch.Tensor:
     """Convert audio to float 32 bits PCM format."""
     if wav.dtype.is_floating_point:
         return wav
@@ -189,7 +191,7 @@ def f32_pcm(wav):
         return wav.float() / (2**15 - 1)
 
 
-def as_dtype_pcm(wav, dtype):
+def as_dtype_pcm(wav: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
     """Convert audio to either f32 pcm or i16 pcm depending on the given dtype."""
     if wav.dtype.is_floating_point:
         return f32_pcm(wav)
@@ -197,7 +199,7 @@ def as_dtype_pcm(wav, dtype):
         return i16_pcm(wav)
 
 
-def encode_mp3(wav, path, samplerate=44100, bitrate=320, quality=2, verbose=False):
+def encode_mp3(wav: torch.Tensor, path: tp.Union[str, Path], samplerate: int = 44100, bitrate: int = 320, quality: int = 2, verbose: bool = False) -> None:
     """Save given audio as mp3. This should work on all OSes."""
     C, T = wav.shape
     wav = i16_pcm(wav)
@@ -208,15 +210,15 @@ def encode_mp3(wav, path, samplerate=44100, bitrate=320, quality=2, verbose=Fals
     encoder.set_quality(quality)  # 2-highest, 7-fastest
     if not verbose:
         encoder.silence()
-    wav = wav.data.cpu()
-    wav = wav.transpose(0, 1).numpy()
-    mp3_data = encoder.encode(wav.tobytes())
+    wav_cpu = wav.data.cpu()
+    wav_numpy = wav_cpu.transpose(0, 1).numpy()
+    mp3_data = encoder.encode(wav_numpy.tobytes())
     mp3_data += encoder.flush()
     with open(path, "wb") as f:
         f.write(mp3_data)
 
 
-def prevent_clip(wav, mode='rescale'):
+def prevent_clip(wav: torch.Tensor, mode: tp.Optional[str] = 'rescale') -> torch.Tensor:
     """
     different strategies for avoiding raw clipping.
     """
@@ -224,7 +226,7 @@ def prevent_clip(wav, mode='rescale'):
         return wav
     assert wav.dtype.is_floating_point, "too late for clipping"
     if mode == 'rescale':
-        wav = wav / max(1.01 * wav.abs().max(), 1)
+        wav = wav / max(1.01 * wav.abs().max().item(), 1.0)
     elif mode == 'clamp':
         wav = wav.clamp(-0.99, 0.99)
     elif mode == 'tanh':

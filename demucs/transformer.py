@@ -17,8 +17,8 @@ from einops import rearrange
 
 
 def create_sin_embedding(
-    length: int, dim: int, shift: int = 0, device="cpu", max_period=10000
-):
+    length: int, dim: int, shift: int = 0, device: str = "cpu", max_period: float = 10000
+) -> torch.Tensor:
     # We aim for TBC format
     assert dim % 2 == 0
     pos = shift + torch.arange(length, device=device).view(-1, 1, 1)
@@ -34,7 +34,7 @@ def create_sin_embedding(
     )
 
 
-def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=10000):
+def create_2d_sin_embedding(d_model: int, height: int, width: int, device: str = "cpu", max_period: float = 10000) -> torch.Tensor:
     """
     :param d_model: dimension of the model
     :param height: height of the positions
@@ -81,7 +81,7 @@ def create_sin_embedding_cape(
     max_scale: float = 1.0,
     device: str = "cpu",
     max_period: float = 10000.0,
-):
+) -> torch.Tensor:
     # We aim for TBC format
     assert dim % 2 == 0
     pos = 1.0 * torch.arange(length).view(-1, 1, 1)  # (length, 1, 1)
@@ -115,21 +115,21 @@ def create_sin_embedding_cape(
     ).float()
 
 
-def get_causal_mask(length):
+def get_causal_mask(length: int) -> torch.Tensor:
     pos = torch.arange(length)
     return pos > pos[:, None]
 
 
 def get_elementary_mask(
-    T1,
-    T2,
-    mask_type,
-    sparse_attn_window,
-    global_window,
-    mask_random_seed,
-    sparsity,
-    device,
-):
+    T1: int,
+    T2: int,
+    mask_type: str,
+    sparse_attn_window: int,
+    global_window: int,
+    mask_random_seed: int,
+    sparsity: float,
+    device: str,
+) -> torch.Tensor:
     """
     When the input of the Decoder has length T1 and the output T2
     The mask matrix has shape (T2, T1)
@@ -176,15 +176,15 @@ def get_elementary_mask(
 
 
 def get_mask(
-    T1,
-    T2,
-    mask_type,
-    sparse_attn_window,
-    global_window,
-    mask_random_seed,
-    sparsity,
-    device,
-):
+    T1: int,
+    T2: int,
+    mask_type: str,
+    sparse_attn_window: int,
+    global_window: int,
+    mask_random_seed: int,
+    sparsity: float,
+    device: str,
+) -> torch.Tensor:
     """
     Return a SparseCSRTensor mask that is a combination of elementary masks
     mask_type can be a combination of multiple masks: for instance "diag_jmask_random"
@@ -207,7 +207,7 @@ def get_mask(
         for mask in mask_types
     ]
 
-    final_mask = torch.stack(all_masks).sum(axis=0) > 0
+    final_mask = torch.stack(all_masks).sum(dim=0) > 0
 
     return SparseCSRTensor.from_dense(final_mask[None])
 
@@ -226,10 +226,10 @@ class ScaledEmbedding(nn.Module):
         self.boost = boost
 
     @property
-    def weight(self):
+    def weight(self) -> torch.Tensor:
         return self.embedding.weight * self.boost
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.embedding(x) * self.boost
 
 
@@ -238,7 +238,7 @@ class LayerScale(nn.Module):
     This rescales diagonaly residual outputs close to 0 initially, then learnt.
     """
 
-    def __init__(self, channels: int, init: float = 0, channel_last=False):
+    def __init__(self, channels: int, init: float = 0, channel_last: bool = False):
         """
         channel_last = False corresponds to (B, C, T) tensors
         channel_last = True corresponds to (T, B, C) tensors
@@ -248,7 +248,7 @@ class LayerScale(nn.Module):
         self.scale = nn.Parameter(torch.zeros(channels, requires_grad=True))
         self.scale.data[:] = init
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.channel_last:
             return self.scale * x
         else:
@@ -256,10 +256,10 @@ class LayerScale(nn.Module):
 
 
 class MyGroupNorm(nn.GroupNorm):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: tp.Any, **kwargs: tp.Any) -> None:
         super().__init__(*args, **kwargs)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         x: (B, T, C)
         if num_groups=1: Normalisation on all T and C together for each B

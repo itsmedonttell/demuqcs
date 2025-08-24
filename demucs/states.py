@@ -14,13 +14,14 @@ import inspect
 import io
 from pathlib import Path
 import warnings
+import typing as tp
 
 from omegaconf import OmegaConf
 from dora.log import fatal
 import torch
 
 
-def _check_diffq():
+def _check_diffq() -> None:
     try:
         import diffq  # noqa
     except ImportError:
@@ -29,7 +30,7 @@ def _check_diffq():
               'On Linux/Mac, run: python3 -m pip install diffq')
 
 
-def get_quantizer(model, args, optimizer=None):
+def get_quantizer(model: torch.nn.Module, args: tp.Any, optimizer: tp.Optional[tp.Any] = None) -> tp.Optional[tp.Any]:
     """Return the quantizer given the XP quantization args."""
     quantizer = None
     if args.diffq:

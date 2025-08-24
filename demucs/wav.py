@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import tqdm
+import typing as tp
 
 import musdb
 import julius
@@ -24,8 +25,8 @@ from torch.nn import functional as F
 from .audio import convert_audio_channels
 from . import distrib
 
-MIXTURE = "mixture"
-EXT = ".wav"
+MIXTURE: str = "mixture"
+EXT: str = ".wav"
 
 
 def _track_metadata(track, sources, normalize=True, ext=EXT):

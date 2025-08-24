@@ -8,6 +8,7 @@
 import random
 import subprocess as sp
 import tempfile
+import typing as tp
 
 from . import audio_legacy
 import torch
@@ -20,8 +21,8 @@ class RepitchedWrapper:
     """
     Wrap a dataset to apply online change of pitch / tempo.
     """
-    def __init__(self, dataset, proba=0.2, max_pitch=2, max_tempo=12,
-                 tempo_std=5, vocals=[3], same=True):
+    def __init__(self, dataset: tp.Any, proba: float = 0.2, max_pitch: int = 2, max_tempo: int = 12,
+                 tempo_std: int = 5, vocals: tp.List[int] = [3], same: bool = True) -> None:
         self.dataset = dataset
         self.proba = proba
         self.max_pitch = max_pitch
@@ -57,7 +58,7 @@ class RepitchedWrapper:
         return streams
 
 
-def repitch(wav, pitch, tempo, voice=False, quick=False, samplerate=44100):
+def repitch(wav: torch.Tensor, pitch: float, tempo: float, voice: bool = False, quick: bool = False, samplerate: int = 44100) -> torch.Tensor:
     """
     tempo is a relative delta in percentage, so tempo=10 means tempo at 110%!
     pitch is in semi tones.
