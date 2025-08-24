@@ -206,6 +206,7 @@ def apply_model(model: tp.Union[BagOfModels, Model],
         totals = [0.] * len(model.sources)
         callback_arg["models"] = len(model.models)
         for sub_model, model_weights in zip(model.models, model.weights):
+            sub_model = tp.cast(Model, sub_model)  # ModuleList iteration loses type info
             kwargs["callback"] = ((
                     lambda d, i=callback_arg["model_idx_in_bag"]: callback(
                         _replace_dict(d, ("model_idx_in_bag", i))) if callback else None)
