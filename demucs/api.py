@@ -29,6 +29,7 @@ import torchaudio as ta
 from dora.log import fatal
 from pathlib import Path
 from typing import Optional, Callable, Dict, Tuple, Union
+import typing as tp
 
 from .apply import apply_model, _replace_dict
 from .audio import AudioFile, convert_audio, save_audio
@@ -135,7 +136,7 @@ class Separator:
             Union[Callable[[dict], None], _NotProvided]
         ] = NotProvided,
         callback_arg: Optional[Union[dict, _NotProvided]] = NotProvided,
-    ):
+    ) -> None:
         """
         Update the parameters of separation.
 
@@ -201,14 +202,14 @@ class Separator:
         if not isinstance(callback_arg, _NotProvided):
             self._callback_arg = callback_arg
 
-    def _load_model(self):
+    def _load_model(self) -> None:
         self._model = get_model(name=self._name, repo=self._repo)
         if self._model is None:
             raise LoadModelError("Failed to load model")
         self._audio_channels = self._model.audio_channels
         self._samplerate = self._model.samplerate
 
-    def _load_audio(self, track: Path):
+    def _load_audio(self, track: Path) -> th.Tensor:
         errors = {}
         wav = None
 
@@ -291,7 +292,7 @@ class Separator:
         wav += ref.mean()
         return (wav, dict(zip(self._model.sources, out[0])))
 
-    def separate_audio_file(self, file: Path):
+    def separate_audio_file(self, file: Path) -> Tuple[th.Tensor, Dict[str, th.Tensor]]:
         """
         Separate an audio file. The method will automatically read the file.
 
@@ -308,15 +309,15 @@ class Separator:
         return self.separate_tensor(self._load_audio(file), self.samplerate)
 
     @property
-    def samplerate(self):
+    def samplerate(self) -> int:
         return self._samplerate
 
     @property
-    def audio_channels(self):
+    def audio_channels(self) -> int:
         return self._audio_channels
 
     @property
-    def model(self):
+    def model(self) -> tp.Any:
         return self._model
 
 
