@@ -9,18 +9,19 @@
 import random
 import torch as th
 from torch import nn
+import typing as tp
 
 
 class Shift(nn.Module):
     """
     Randomly shift audio in time by up to `shift` samples.
     """
-    def __init__(self, shift=8192, same=False):
+    def __init__(self, shift: int = 8192, same: bool = False) -> None:
         super().__init__()
         self.shift = shift
         self.same = same
 
-    def forward(self, wav):
+    def forward(self, wav: th.Tensor) -> th.Tensor:
         batch, sources, channels, time = wav.size()
         length = time - self.shift
         if self.shift > 0:
@@ -39,7 +40,7 @@ class FlipChannels(nn.Module):
     """
     Flip left-right channels.
     """
-    def forward(self, wav):
+    def forward(self, wav: th.Tensor) -> th.Tensor:
         batch, sources, channels, time = wav.size()
         if self.training and wav.size(2) == 2:
             left = th.randint(2, (batch, sources, 1, 1), device=wav.device)
@@ -53,7 +54,7 @@ class FlipSign(nn.Module):
     """
     Random sign flip.
     """
-    def forward(self, wav):
+    def forward(self, wav: th.Tensor) -> th.Tensor:
         batch, sources, channels, time = wav.size()
         if self.training:
             signs = th.randint(2, (batch, sources, 1, 1), device=wav.device, dtype=th.float32)
@@ -65,7 +66,7 @@ class Remix(nn.Module):
     """
     Shuffle sources to make new mixes.
     """
-    def __init__(self, proba=1, group_size=4):
+    def __init__(self, proba: float = 1, group_size: int = 4) -> None:
         """
         Shuffle sources within one batch.
         Each batch is divided into groups of size `group_size` and shuffling is done within
@@ -78,7 +79,7 @@ class Remix(nn.Module):
         self.proba = proba
         self.group_size = group_size
 
-    def forward(self, wav):
+    def forward(self, wav: th.Tensor) -> th.Tensor:
         batch, streams, channels, time = wav.size()
         device = wav.device
 
@@ -96,13 +97,13 @@ class Remix(nn.Module):
 
 
 class Scale(nn.Module):
-    def __init__(self, proba=1., min=0.25, max=1.25):
+    def __init__(self, proba: float = 1., min: float = 0.25, max: float = 1.25) -> None:
         super().__init__()
         self.proba = proba
         self.min = min
         self.max = max
 
-    def forward(self, wav):
+    def forward(self, wav: th.Tensor) -> th.Tensor:
         batch, streams, channels, time = wav.size()
         device = wav.device
         if self.training and random.random() < self.proba:
